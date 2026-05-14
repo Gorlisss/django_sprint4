@@ -1,3 +1,5 @@
+"""Модели данных для приложения блог."""
+
 from django.db import models
 from django.contrib.auth import get_user_model
 
@@ -6,6 +8,8 @@ User = get_user_model()
 
 
 class Location(models.Model):
+    """Местоположение поста."""
+
     name = models.CharField(max_length=256, verbose_name='Название места')
     is_published = models.BooleanField(
         default=True,
@@ -18,14 +22,19 @@ class Location(models.Model):
     )
 
     class Meta:
+        """Метаданные модели."""
+
         verbose_name = 'местоположение'
         verbose_name_plural = 'Местоположения'
 
     def __str__(self):
+        """Возвращает строковое представление местоположения."""
         return self.name
 
 
 class Category(models.Model):
+    """Категория поста."""
+
     title = models.CharField(max_length=256, verbose_name='Заголовок')
     description = models.TextField(verbose_name='Описание')
     slug = models.SlugField(
@@ -47,14 +56,19 @@ class Category(models.Model):
     )
 
     class Meta:
+        """Метаданные модели."""
+
         verbose_name = 'категория'
         verbose_name_plural = 'Категории'
 
     def __str__(self):
+        """Возвращает строковое представление местоположения."""
         return self.title
 
 
 class Post(models.Model):
+    """Пост блога."""
+
     title = models.CharField(max_length=256, verbose_name='Заголовок')
     text = models.TextField(verbose_name='Текст')
     pub_date = models.DateTimeField(
@@ -95,14 +109,19 @@ class Post(models.Model):
     image = models.ImageField('Фото', upload_to='posts_images', blank=True)
 
     class Meta:
+        """Метаданные модели."""
+
         verbose_name = 'публикация'
         verbose_name_plural = 'Публикации'
 
     def __str__(self):
+        """Возвращает строковое представление местоположения."""
         return self.title
 
 
 class Comment(models.Model):
+    """Комментарий к посту."""
+
     text = models.TextField('Текст комментария')
     post = models.ForeignKey(
         Post,
@@ -119,9 +138,12 @@ class Comment(models.Model):
                                       verbose_name='Добавлено')
 
     class Meta:
+        """Метаданные модели."""
+
         ordering = ('created_at',)
         verbose_name = 'комментарий'
         verbose_name_plural = 'Комментарии'
 
     def __str__(self):
+        """Возвращает строковое представление местоположения."""
         return self.text[:20]
