@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}
+  Удаление комментария
+{% endblock %}
+
+{% block content %}
+  <div class="container py-5">
+    <h1 class="mb-4">Удаление комментария</h1>
+    <p class="mb-3">Вы уверены, что хотите удалить этот комментарий?</p>
+    
+    <div class="card mb-4">
+      <div class="card-body">
+        <p class="card-text">{{ comment.text }}</p>
+        <small class="text-muted">
+          Автор: {{ comment.author.username }} | 
+          {{ comment.created_at|date:"d E Y" }}
+        </small>
+      </div>
+    </div>
+    
+    <form method="post">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-danger">Да, удалить</button>
+      <a href="{% url 'blog:post_detail' comment.post.id %}" class="btn btn-secondary">Отмена</a>
+    </form>
+  </div>
+{% endblock %}
