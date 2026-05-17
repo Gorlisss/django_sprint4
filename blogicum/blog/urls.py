@@ -7,7 +7,7 @@ app_name = "blog"  # namespace
 
 urlpatterns = [
     path("", views.IndexListView.as_view(), name="index"),
-    path("posts/<int:id>/", views.post_detail, name="post_detail"),
+    path("posts/<int:post_id>/", views.post_detail, name="post_detail"),
     path(
         "category/<slug:category_slug>/",
         views.CategoryPostsListView.as_view(),

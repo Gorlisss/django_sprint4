@@ -13,6 +13,31 @@ from django.db.models import Count
 from django.http import Http404
 
 
+def _base_published_filter(queryset):
+    """Базовая фильтрация опубликованных постов."""
+    return queryset.filter(
+        is_published=True,
+        pub_date__lte=timezone.now(),
+        category__is_published=True
+    )
+
+
+def _get_published_posts_with_comments(queryset=None):
+    """Возвращает опубликованные посты с аннотацией количества комментариев."""
+    if queryset is None:
+        queryset = Post.objects.all()
+    return _base_published_filter(queryset).annotate(
+        comment_count=Count('comments')
+    ).order_by('-pub_date')
+
+
+def _get_posts_with_comments(queryset):
+    """Универсальная аннотация комментариев для любого queryset."""
+    return queryset.annotate(
+        comment_count=Count('comments')
+    ).order_by('-pub_date')
+
+
 class PostDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
     """Удаление поста."""
 
@@ -28,7 +53,7 @@ class PostDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
 
     def handle_no_permission(self):
         """Переадрессация при отсутствии прав."""
-        return redirect('blog:post_detail', id=self.kwargs['post_id'])
+        return redirect('blog:post_detail', post_id=self.kwargs['post_id'])
 
 
 class PostUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
@@ -46,12 +71,12 @@ class PostUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
 
     def handle_no_permission(self):
         """Переадрессация при отсутствии прав."""
-        return redirect('blog:post_detail', id=self.kwargs['post_id'])
+        return redirect('blog:post_detail', post_id=self.kwargs['post_id'])
 
     def get_success_url(self):
         """Переадрессация после редактирвоания."""
         return reverse_lazy('blog:post_detail',
-                            kwargs={'id': self.kwargs['post_id']})
+                            kwargs={'post_id': self.kwargs['post_id']})
 
 
 class IndexListView(ListView):
@@ -63,12 +88,7 @@ class IndexListView(ListView):
     paginate_by = 10
 
     def get_queryset(self):
-        """Детальная страница отдельного поста."""
-        return Post.objects.filter(
-            is_published=True,
-            pub_date__lte=timezone.now(),
-            category__is_published=True
-        ).order_by('-pub_date')
+        return _get_published_posts_with_comments()
 
 
 class CategoryPostsListView(ListView):
@@ -86,11 +106,9 @@ class CategoryPostsListView(ListView):
             slug=self.kwargs['category_slug'],
             is_published=True
         )
-        return Post.objects.filter(
-            category=self.category,
-            is_published=True,
-            pub_date__lte=timezone.now()
-        ).order_by('-pub_date')
+        return _get_published_posts_with_comments(
+            self.category.post_set.all()
+        )
 
     def get_context_data(self, **kwargs):
         """Добавляет категорию в контекст шаблона."""
@@ -112,15 +130,12 @@ class ProfileListView(ListView):
         self.profile_user = get_object_or_404(User,
                                               username=self.kwargs['username'])
         if self.request.user == self.profile_user:
-            return Post.objects.filter(author=self.profile_user
-                                       ).annotate(
-                                           comment_count=Count('comments')
-                                           ).order_by('-pub_date')
-        return Post.objects.filter(
-            author=self.profile_user,
-            is_published=True,
-            pub_date__lte=timezone.now()
-        ).annotate(comment_count=Count('comments')).order_by('-pub_date')
+            return _get_posts_with_comments(
+                Post.objects.filter(author=self.profile_user)
+            )
+        return _get_published_posts_with_comments(
+            Post.objects.filter(author=self.profile_user)
+        )
 
     def get_context_data(self, **kwargs):
         """Добавляет профиль пользователя в контекст шаблона."""
@@ -147,12 +162,16 @@ class PostCreateView(LoginRequiredMixin, CreateView):
                             kwargs={'username': self.request.user.username})
 
 
-def post_detail(request, id):
+def post_detail(request, post_id):
     """Детальная страница отдельного поста."""
-    post = get_object_or_404(Post, id=id)
-
-    if (not post.is_published or post.pub_date > timezone.now() or
-            not post.category.is_published):
+    published_post = _base_published_filter(Post.objects.all()).filter(
+        id=post_id).first()
+    
+    if published_post:
+        post = published_post
+    else:
+        # Если опубликованного нет, проверяем, может быть это черновик автора
+        post = get_object_or_404(Post, id=post_id)
         if not request.user.is_authenticated or request.user != post.author:
             raise Http404("Пост не доступен")
 
@@ -185,7 +204,7 @@ def add_comment(request, post_id):
         comment.author = request.user
         comment.post = post
         comment.save()
-    return redirect('blog:post_detail', id=post_id)
+    return redirect('blog:post_detail', post_id=post_id)
 
 
 @login_required
@@ -193,12 +212,12 @@ def edit_comment(request, post_id, comment_id):
     """Редактирование комментария."""
     comment = get_object_or_404(Comment, pk=comment_id, post__pk=post_id)
     if comment.author != request.user:
-        return redirect('blog:post_detail', id=post_id)
+        return redirect('blog:post_detail', post_id=post_id)
 
     form = CommentForm(request.POST or None, instance=comment)
     if form.is_valid():
         form.save()
-        return redirect('blog:post_detail', id=post_id)
+        return redirect('blog:post_detail', post_id=post_id)
 
     return render(request, 'blog/comment.html',
                   {'form': form, 'comment': comment})
@@ -210,9 +229,9 @@ def delete_comment(request, post_id, comment_id):
     comment = get_object_or_404(Comment, pk=comment_id, post__pk=post_id)
 
     if comment.author != request.user:
-        return redirect('blog:post_detail', id=post_id)
+        return redirect('blog:post_detail', post_id=post_id)
     if request.method == 'GET':
         return render(request, 'blog/comment_delete.html',
                       {'comment': comment})
     comment.delete()
-    return redirect('blog:post_detail', id=post_id)
+    return redirect('blog:post_detail', post_id=post_id)

@@ -92,8 +92,9 @@ class Post(models.Model):
     )
     category = models.ForeignKey(
         Category,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         null=True,
+        blank=True,
         verbose_name='Категория',
     )
     is_published = models.BooleanField(
