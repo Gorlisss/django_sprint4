@@ -166,12 +166,13 @@ def post_detail(request, post_id):
     """Детальная страница отдельного поста."""
     published_post = _base_published_filter(Post.objects.all()).filter(
         id=post_id).first()
-    
+
     if published_post:
         post = published_post
     else:
         # Если опубликованного нет, проверяем, может быть это черновик автора
         post = get_object_or_404(Post, id=post_id)
+
         if not request.user.is_authenticated or request.user != post.author:
             raise Http404("Пост не доступен")
 
@@ -212,6 +213,7 @@ def edit_comment(request, post_id, comment_id):
     """Редактирование комментария."""
     comment = get_object_or_404(Comment, pk=comment_id, post__pk=post_id)
     if comment.author != request.user:
+
         return redirect('blog:post_detail', post_id=post_id)
 
     form = CommentForm(request.POST or None, instance=comment)
